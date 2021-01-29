@@ -1,84 +1,105 @@
-import React from "react";
+import React, { useState, useRef, useEffect } from "react";
 import "./App.css";
+import Form from "./components/Form";
+import FilterButton from "./components/FilterButton";
+import Todo from "./components/Todo";
+import { nanoid } from "nanoid";
 
-export default class TodoApp extends React.Component {
-  constructor(props) {
-    super(props);
-    this.state = { items: [], text: "" };
-    this.handleChange = this.handleChange.bind(this);
-    this.handleSubmit = this.handleSubmit.bind(this);
-  }
+function usePrevious(value) {
+  const ref = useRef();
+  useEffect(() => {
+    ref.current = value;
+  });
+  return ref.current;
+}
 
-  render() {
-    return (
-      <div>
-        <h1>TODO LIST</h1>
+function App(props) {
+  const [filter, setFilter] = useState("All");
+  const [tasks, setTasks] = useState(props.tasks);
 
-        <form onSubmit={this.handleSubmit}>
-          <label htmlFor="new-todo">
-            <h3>What needs to be finished?</h3>
-          </label>{" "}
-          <p></p>
-          <input
-            id="new-todo"
-            onChange={this.handleChange}
-            value={this.state.text}
-          />
-          <button style={{ margin: "5px" }}>
-            Add #{this.state.items.length + 1}
-          </button>
-          <p></p>
-          <input type="checkbox" value="0" id="checkbox1" />
-          Tick when you Finished !
-        </form>
-        <TodoList items={this.state.items} />
-      </div>
-    );
-  }
-
-  handleChange(e) {
-    this.setState({ text: e.target.value });
-  }
-  handleDelete = (id) => {
-    const newItem = this.state.items.filter((item) => item.id !== id);
-    this.setState({ items: newItem });
+  const FILTER_MAP = {
+    All: () => true,
+    Doing: (task) => !task.completed,
+    Completed: (task) => task.completed,
   };
-  handleSubmit(e) {
-    e.preventDefault();
-    if (this.state.text.length === 0) {
-      return;
-    }
-    const newItem = {
-      text: this.state.text,
-      id: Date.now(),
-    };
-    this.setState((state) => ({
-      items: state.items.concat(newItem),
-      text: "",
-    }));
+  const taskList = tasks
+    .filter(FILTER_MAP[filter])
+    .map((task) => (
+      <Todo
+        id={task.id}
+        name={task.name}
+        completed={task.completed}
+        key={task.id}
+        toggleTaskCompleted={toggleTaskCompleted}
+        deleteTask={deleteTask}
+        editTask={editTask}
+      />
+    ));
+
+  const FILTER_NAMES = Object.keys(FILTER_MAP);
+  const filterList = FILTER_NAMES.map((name) => (
+    <FilterButton
+      key={name}
+      name={name}
+      isPressed={name === filter}
+      setFilter={setFilter}
+    />
+  ));
+
+  const tasksNoun = taskList.length !== 1 ? "tasks" : "task";
+  const headingText = `${taskList.length} ${tasksNoun} remaining`;
+
+  const addTask = (name) => {
+    const newTask = { id: "todo-" + nanoid(), name: name, completed: false };
+    setTasks([...tasks, newTask]);
+    console.log([...tasks]);
+  };
+  function toggleTaskCompleted(id) {
+    const updatedTasks = tasks.map((task) => {
+      if (id === task.id) {
+        return { ...task, completed: !task.completed };
+      }
+      return task;
+    });
+    setTasks(updatedTasks);
   }
+  function deleteTask(id) {
+    const remainingTasks = tasks.filter((task) => id !== task.id);
+    setTasks(remainingTasks);
+  }
+
+  function editTask(id, newName) {
+    const editedTaskList = tasks.map((task) => {
+      if (id === task.id) {
+        return { ...task, name: newName };
+      }
+      return task;
+    });
+    setTasks(editedTaskList);
+  }
+  const listHeadingRef = useRef(null);
+  const prevTaskLength = usePrevious(tasks.length);
+  useEffect(() => {
+    if (tasks.length - prevTaskLength === -1) {
+      listHeadingRef.current.focus();
+    }
+  }, [tasks.length, prevTaskLength]);
+  return (
+    <div className="todoapp stack-large">
+      <Form addTask={addTask} />
+      <div className="filters btn-group stack-exception">{filterList}</div>
+      <h2 id="list-heading" tabIndex="-1" ref={listHeadingRef}>
+        {headingText}
+      </h2>
+      <ul
+        role="list"
+        className="todo-list stack-large stack-exception"
+        aria-labelledby="list-heading"
+      >
+        {taskList}
+      </ul>
+    </div>
+  );
 }
 
-class TodoList extends React.Component {
-  render() {
-    return (
-      <ul>
-        {this.props.items.map((item) => (
-          <li key={item.id}>
-            {item.text}
-            <button
-              onClick={() => this.handleDelete(item.id)}
-              style={{ margin: "20px" }}
-            >
-              Delete
-            </button>
-            <button onClick={this.onUpdate} style={{ margin: "5px" }}>
-              {" "}
-              Edit
-            </button>
-          </li>
-        ))}
-      </ul>
-    );
-  }
-}
+export default App;
